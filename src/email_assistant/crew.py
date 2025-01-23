@@ -11,7 +11,7 @@ from email_assistant import models
 from email_assistant.tools.qdrant_tool.tool import (
     QdrantSearchTool,
 )
-from src.email_assistant.storage import QdrantStorage
+from email_assistant.storage import QdrantStorage
 
 
 class BaseCrew(abc.ABC):

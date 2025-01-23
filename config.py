@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+# Load dotenv file
+load_dotenv(".env")
 
 # Embedder configuration
 embedder_config = {

@@ -1,7 +1,7 @@
 # webinar-email-assistant-crewai-obsidian
 
 This repository contains materials from the hands-on webinar "[Building Intelligent Agentic RAG with CrewAI and 
-Qdrant](https://try.qdrant.tech/agentic-rag-crewai)". It implements an agentic RAG system that uses your existing 
+Qdrant](https://www.youtube.com/watch?v=soGB3UowTZ0)". It implements an agentic RAG system that uses your existing 
 [Obsidian](https://obsidian.md/) Vault as a knowledge base to draft emails in Gmail Inbox.
 
 ## Software Stack
@@ -88,4 +88,4 @@ This launches two threads:
 2. A CrewAI agent that monitors your Gmail inbox and drafts responses based on knowledge stored in the Obsidian Vault
 
 For a detailed explanation of the system and its components, refer to the [webinar 
-recording](https://try.qdrant.tech/agentic-rag-crewai) and the source code in this repository.
+recording](https://www.youtube.com/watch?v=soGB3UowTZ0) and the source code in this repository.

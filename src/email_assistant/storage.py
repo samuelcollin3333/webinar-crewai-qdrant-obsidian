@@ -168,3 +168,34 @@ class QdrantStorage(RAGStorage):
         else:
             # If embedder_config is already a function, use it as is
             pass
+
+    def get_all_page_ids(self) -> set:
+        """
+        Get all Notion page IDs stored in Qdrant
+        Returns:
+            set: Set of page IDs
+        """
+        try:
+            # Search for all points with notion_page_id in metadata
+            results = self.app.scroll(
+                collection_name=self.type,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="metadata.notion_page_id",
+                            match=models.MatchValue(value={"$exists": True}),
+                        )
+                    ]
+                ),
+                limit=100  # Adjust based on your needs
+            )
+            
+            page_ids = set()
+            for batch in results:
+                for point in batch[0]:
+                    if point.payload and "notion_page_id" in point.payload:
+                        page_ids.add(point.payload["notion_page_id"])
+            return page_ids
+        except Exception as e:
+            logger.error(f"Error getting page IDs from Qdrant: {e}")
+            return set()

@@ -1,6 +1,8 @@
 import logging
 import signal
 from pathlib import Path
+import time
+import sys
 
 # Configure logging first, before any other operations
 logging.basicConfig(
@@ -33,30 +35,64 @@ signal.signal(signal.SIGINT, signal.default_int_handler)
 WORKING_DIR = Path(__file__).parent
 GMAIL_INBOX_STATE_FILE = WORKING_DIR / "gmail_inbox_state.json"
 
+# Reduce noise from AI processing logs
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
+logging.getLogger('litellm').setLevel(logging.ERROR)
+logging.getLogger('litellm.cost_calculator').setLevel(logging.ERROR)
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals"""
+    logger.info("Received shutdown signal. Stopping services...")
+    sys.exit(0)
 
 def create_notion_sync():
     """
     Sync Notion content into the knowledge base.
     """
-    # Add debug logging for configuration values
+    SYNC_INTERVAL = 600  # 10 minutes in seconds
+    
     logger.debug("Configuration values:")
-    logger.debug("Embedder config: %s", config.embedder_config)
-    logger.debug("Qdrant location: %s", config.qdrant_location)
-    logger.debug("Qdrant collection: %s", config.qdrant_collection_name)
-    logger.debug("Notion API key present: %s", bool(config.notion_api_key))
-
+    logger.debug(f"Embedder config: {config.embedder_config}")
+    logger.debug(f"Qdrant location: {config.qdrant_location}")
+    logger.debug(f"Qdrant collection: {config.qdrant_collection_name}")
+    logger.debug(f"Notion API key present: {bool(config.notion_api_key)}")
+    logger.debug(f"Sync interval: {SYNC_INTERVAL} seconds (10 minutes)")
+    
     logger.info("Initializing Notion sync")
-
-    # Create handler for Notion integration
+    
     handler = NotionToQdrantHandler(
         embedder_config=config.embedder_config,
         qdrant_location=config.qdrant_location,
         qdrant_api_key=config.qdrant_api_key,
         notion_api_key=config.notion_api_key
     )
-
-    # Initialize the Qdrant collection with existing content
-    handler.initialize()
+    
+    try:
+        sync_count = 0
+        while True:  # Continuous sync loop
+            try:
+                sync_count += 1
+                start_time = time.time()
+                logger.info(f"Starting Notion sync cycle #{sync_count}")
+                
+                handler.sync_notion_to_qdrant()
+                
+                end_time = time.time()
+                duration = end_time - start_time
+                logger.info(f"Sync cycle #{sync_count} completed in {duration:.1f} seconds")
+                logger.info(f"Next sync will run in {SYNC_INTERVAL/60:.1f} minutes (at {time.strftime('%H:%M:%S', time.localtime(end_time + SYNC_INTERVAL))})")
+                
+                time.sleep(SYNC_INTERVAL)
+                
+            except KeyboardInterrupt:
+                raise  # Re-raise to be handled by outer try block
+            except Exception as e:
+                logger.error(f"Error during sync cycle #{sync_count}: {e}")
+                logger.info(f"Waiting {SYNC_INTERVAL/60:.1f} minutes before retry...")
+                time.sleep(SYNC_INTERVAL)
+    finally:
+        logger.info("Notion sync process terminated. Goodbye!")
     
     return handler
 
@@ -91,27 +127,11 @@ def create_notion_sync():
 
 
 if __name__ == "__main__":
-    # Set logging to DEBUG level to see configuration values
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-
-    # Add early configuration logging
-    logger.debug("Initial Configuration values:")
-    logger.debug("Embedder config: %s", config.embedder_config)
-    logger.debug("Embedder provider: %s", config.embedder_config.get("provider"))
-    logger.debug("Embedder API key present: %s", bool(config.embedder_config.get("config", {}).get("api_key")))
-    logger.debug("Qdrant location: %s", config.qdrant_location)
-    logger.debug("Qdrant collection: %s", config.qdrant_collection_name)
-    logger.debug("Notion API key present: %s", bool(config.notion_api_key))
-
-    logger.info("Starting Notion sync")
-    notion_handler = create_notion_sync()
-
+    # Register signal handler
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     try:
-        # Keep the program running
-        signal.pause()
-    except KeyboardInterrupt as e:
-        logger.info("Stopping Notion sync...")
-        logger.info("Monitoring stopped! Exiting.")
+        create_notion_sync()
+    except KeyboardInterrupt:
+        sys.exit(0)

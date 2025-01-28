@@ -3,6 +3,7 @@ from typing import Optional, List, Any, Dict
 
 from crewai.memory.storage.rag_storage import RAGStorage
 from qdrant_client import QdrantClient, models
+from chromadb.utils import embedding_functions
 
 
 class QdrantStorage(RAGStorage):
@@ -24,8 +25,9 @@ class QdrantStorage(RAGStorage):
         qdrant_location: Optional[str] = None,
         qdrant_api_key: Optional[str] = None,
     ):
-        self._qdrant_location = qdrant_location
+        self._qdrant_location = qdrant_location or "http://localhost:6333"
         self._qdrant_api_key = qdrant_api_key
+        self.type = type
         super().__init__(type, allow_reset, embedder_config, crew)
 
     def search(
@@ -148,3 +150,21 @@ class QdrantStorage(RAGStorage):
                 )
             )
         return models.Filter(must=must)
+
+    def _set_embedder_config(self):
+        """Override the default embedder configuration to use Google's embeddings."""
+        if isinstance(self.embedder_config, dict):
+            provider = self.embedder_config.get('provider', '').lower()
+            if provider == 'google':
+                from langchain_google_genai import GoogleGenerativeAIEmbeddings
+                embeddings = GoogleGenerativeAIEmbeddings(
+                    model=self.embedder_config['config']['model'],
+                    google_api_key=self.embedder_config['config']['api_key'],
+                )
+                self.embedder_config = embeddings.embed_documents
+            else:
+                # Fall back to parent implementation for other providers
+                super()._set_embedder_config()
+        else:
+            # If embedder_config is already a function, use it as is
+            pass

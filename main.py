@@ -2,49 +2,66 @@ import logging
 import signal
 from pathlib import Path
 
-from watchdog.observers import Observer as FileSystemListener
+# Configure logging first, before any other operations
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-import config
-from email_assistant.gmail.handlers import AgenticAutoReplyHandler
-from email_assistant.gmail.inbox import GmailInboxListener, GmailInboxState
-from email_assistant.obsidian.handlers import AgenticObsidianVaultToQdrantHandler
+logger.debug("Starting script...")
+logger.debug("Loading config module...")
 
-import agentops
+import config  # Import config after logging is configured
+
+# Remove filesystem observer imports since we're using API
+# from watchdog.observers import Observer as FileSystemListener, Observer
+
+#from email_assistant.gmail.handlers import AgenticAutoReplyHandler
+#from email_assistant.gmail.inbox import GmailInboxListener, GmailInboxState
+from email_assistant.notion.handlers import NotionToQdrantHandler
+
+# import agentops  # Comment out or remove this line
 
 # Set the default signal handler for SIGINT, so the KeyboardInterrupt exception is raised
 signal.signal(signal.SIGINT, signal.default_int_handler)
 
 # Optional: Initialize AgentOps if the API key is provided
-if config.agentops_api_key is not None:
-    agentops.init(api_key=config.agentops_api_key)
+# if config.agentops_api_key is not None:
+#     agentops.init(api_key=config.agentops_api_key)
 
 WORKING_DIR = Path(__file__).parent
 GMAIL_INBOX_STATE_FILE = WORKING_DIR / "gmail_inbox_state.json"
 
-logger = logging.getLogger(__name__)
 
-
-def create_filesystem_listener() -> FileSystemListener:
+def create_notion_sync():
     """
-    Watch any changes done in the Obsidian vault and load them into the knowledge base.
+    Sync Notion content into the knowledge base.
     """
-    logger.info("Watching for filesystem changes at %s", config.obsidian_vault_path)
+    # Add debug logging for configuration values
+    logger.debug("Configuration values:")
+    logger.debug("Embedder config: %s", config.embedder_config)
+    logger.debug("Qdrant location: %s", config.qdrant_location)
+    logger.debug("Qdrant collection: %s", config.qdrant_collection_name)
+    logger.debug("Notion API key present: %s", bool(config.notion_api_key))
 
-    # Handler's methods are going to be called when a file is created, modified, or deleted
-    event_handler = AgenticObsidianVaultToQdrantHandler(
-        config.embedder_config, config.qdrant_location, config.qdrant_api_key
+    logger.info("Initializing Notion sync")
+
+    # Create handler for Notion integration
+    handler = NotionToQdrantHandler(
+        embedder_config=config.embedder_config,
+        qdrant_location=config.qdrant_location,
+        qdrant_api_key=config.qdrant_api_key,
+        notion_api_key=config.notion_api_key
     )
 
-    # Initialize the Qdrant collection with existing files
-    event_handler.initialize(config.obsidian_vault_path)
-
-    # Observer listens for filesystem events
-    listener = FileSystemListener()
-    listener.schedule(event_handler, config.obsidian_vault_path, recursive=True)
-    return listener
+    # Initialize the Qdrant collection with existing content
+    handler.initialize()
+    
+    return handler
 
 
-def create_gmail_listener() -> GmailInboxListener:
+#def create_gmail_listener() -> GmailInboxListener:
     """
     Monitor the Gmail inbox for new emails and handle them accordingly.
     """
@@ -74,30 +91,27 @@ def create_gmail_listener() -> GmailInboxListener:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    # Set logging to DEBUG level to see configuration values
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 
-    # Start monitoring the Gmail inbox and filesystem changes
-    logger.info("Starting the monitoring of Gmail inbox and filesystem changes")
+    # Add early configuration logging
+    logger.debug("Initial Configuration values:")
+    logger.debug("Embedder config: %s", config.embedder_config)
+    logger.debug("Embedder provider: %s", config.embedder_config.get("provider"))
+    logger.debug("Embedder API key present: %s", bool(config.embedder_config.get("config", {}).get("api_key")))
+    logger.debug("Qdrant location: %s", config.qdrant_location)
+    logger.debug("Qdrant collection: %s", config.qdrant_collection_name)
+    logger.debug("Notion API key present: %s", bool(config.notion_api_key))
 
-    # Connect to Obsidian vault first and monitor the changes
-    file_system_listener = create_filesystem_listener()
-    file_system_listener.start()
+    logger.info("Starting Notion sync")
+    notion_handler = create_notion_sync()
 
-    # Monitor the Gmail inbox
-    gmail_inbox_listener = create_gmail_listener()
-    gmail_inbox_listener.start()
-
-    # Wait until all threads are finished (they should run indefinitely, or until interrupted)
     try:
-        file_system_listener.join()
-        gmail_inbox_listener.join()
+        # Keep the program running
+        signal.pause()
     except KeyboardInterrupt as e:
-        logger.info("Stopping the monitoring of the filesystem and Gmail inbox...")
-
-        file_system_listener.stop()
-        gmail_inbox_listener.stop()
-
-        # Save the state of the Gmail inbox
-        gmail_inbox_listener.state().save(GMAIL_INBOX_STATE_FILE)
-
+        logger.info("Stopping Notion sync...")
         logger.info("Monitoring stopped! Exiting.")

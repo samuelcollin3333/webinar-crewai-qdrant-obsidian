@@ -1,0 +1,6 @@
+crewAI
+qdrant-client
+pydantic
+watchdog
+pyyaml
+notion-client

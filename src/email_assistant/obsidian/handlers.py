@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 from typing import Optional
+import os
 
 import yaml
 from watchdog.events import (
@@ -17,8 +18,19 @@ from watchdog.events import (
 
 from email_assistant import models
 from email_assistant.crew import KnowledgeOrganizingCrew
+from notion_client import Client
 
 logger = logging.getLogger(__name__)
+
+
+class NotionToQdrantHandler:
+    def __init__(self, notion_api_key, qdrant_location, qdrant_api_key=None):
+        self.notion = Client(auth=notion_api_key)
+        # Initialize Qdrant and other necessary components
+
+    def sync_notion_to_qdrant(self):
+        # Implement logic to fetch data from Notion and update Qdrant
+        pass
 
 
 class AgenticObsidianVaultToQdrantHandler(FileSystemEventHandler):

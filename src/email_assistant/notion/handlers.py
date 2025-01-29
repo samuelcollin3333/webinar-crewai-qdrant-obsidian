@@ -6,6 +6,7 @@ from email_assistant.models import ContextualizedChunks
 import config
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+from config import qdrant_collection_name
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class NotionToQdrantHandler:
         """
         self.notion = Client(auth=notion_api_key)
         self.qdrant_storage = QdrantStorage(
-            type="notion-notes",  # Add the collection name
+            type=qdrant_collection_name,
             qdrant_location=qdrant_location, 
             qdrant_api_key=qdrant_api_key,
             embedder_config=embedder_config
@@ -164,8 +165,8 @@ class NotionToQdrantHandler:
         try:
             # Get the last edited time from Qdrant metadata
             points = self.qdrant_client.scroll(
-                collection_name="notion-notes",
-                filter=Filter(
+                collection_name=qdrant_collection_name,
+                scroll_filter=Filter(
                     must=[
                         FieldCondition(
                             key="notion_page_id",

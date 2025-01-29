@@ -16,7 +16,7 @@ embedder_config = {
 # Qdrant configuration
 qdrant_location = os.environ.get("QDRANT_LOCATION", "http://localhost:6333")
 qdrant_api_key = os.environ.get("QDRANT_API_KEY") or None
-qdrant_collection_name = "notion-notes"
+qdrant_collection_name = "knowledge-base"
 
 # Obsidian configuration
 obsidian_vault_path = os.environ.get("OBSIDIAN_VAULT_PATH")

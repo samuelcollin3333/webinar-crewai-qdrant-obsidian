@@ -1,0 +1,13 @@
+answer_question:
+  description: >
+    Search the knowledge base for relevant information and provide a
+    comprehensive answer to the following question: {question}
+    Use the QdrantSearchTool to find relevant information in the Notion knowledge base. Always include
+    the sources of information in your answer and explain how the information
+    relates to the question. If you cannot find relevant information, clearly
+    state that. If you find partial information, explain what you found and
+    what's missing.
+  agent: knowledge_searcher
+  expected_output: >
+    A clear and comprehensive answer to the user's question, including
+    citations of the Notion pages where the information was found. 

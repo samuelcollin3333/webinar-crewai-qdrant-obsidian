@@ -172,3 +172,43 @@ class AutoResponderCrew(BaseCrew):
     def is_a_question(self, output: TaskOutput) -> bool:
         email_thread_categories: models.EmailThreadCategories = output.pydantic  # noqa
         return "QUESTION" in email_thread_categories.categories
+
+
+@CrewBase
+class NotionQueryCrew(BaseCrew):
+    """A crew responsible for answering questions about Notion data."""
+
+    agents_config = "config/notion_query/agents.yaml"
+    tasks_config = "config/notion_query/tasks.yaml"
+
+    @agent
+    def knowledge_searcher(self) -> Agent:
+        return Agent(
+            config=self.agents_config["knowledge_searcher"],
+            tools=[
+                QdrantSearchTool(self.knowledge_base()),
+            ],
+            verbose=True,
+            llm="anthropic/claude-3-5-sonnet-20241022",
+        )
+
+    @task
+    def answer_question(self) -> Task:
+        return Task(
+            config=self.tasks_config["answer_question"],
+            output_pydantic=models.NotionAnswer,
+        )
+
+    @crew
+    def crew(self) -> Crew:
+        """Creates the NotionQueryCrew"""
+        return Crew(
+            agents=self.agents,
+            tasks=self.tasks,
+            process=Process.sequential,
+            memory=True,
+            entity_memory=self.entity_memory(),
+            short_term_memory=self.short_term_memory(),
+            embedder=self.embedder_config,
+            verbose=True,
+        )

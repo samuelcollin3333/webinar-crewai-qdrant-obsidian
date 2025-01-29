@@ -1,10 +1,12 @@
 import uuid
+import logging
 from typing import Optional, List, Any, Dict
 
 from crewai.memory.storage.rag_storage import RAGStorage
 from qdrant_client import QdrantClient, models
 from chromadb.utils import embedding_functions
 
+logger = logging.getLogger(__name__)
 
 class QdrantStorage(RAGStorage):
     """

@@ -14,14 +14,15 @@ logger = logging.getLogger(__name__)
 logger.debug("Starting script...")
 logger.debug("Loading config module...")
 
-import config  # Import config after logging is configured
+import config
+from email_assistant.notion.handlers import NotionToQdrantHandler
+from email_assistant.notion.query import NotionQuerier
 
 # Remove filesystem observer imports since we're using API
 # from watchdog.observers import Observer as FileSystemListener, Observer
 
 #from email_assistant.gmail.handlers import AgenticAutoReplyHandler
 #from email_assistant.gmail.inbox import GmailInboxListener, GmailInboxState
-from email_assistant.notion.handlers import NotionToQdrantHandler
 
 # import agentops  # Comment out or remove this line
 
@@ -62,10 +63,10 @@ def create_notion_sync():
     logger.info("Initializing Notion sync")
     
     handler = NotionToQdrantHandler(
-        embedder_config=config.embedder_config,
+        notion_api_key=config.notion_api_key,
         qdrant_location=config.qdrant_location,
         qdrant_api_key=config.qdrant_api_key,
-        notion_api_key=config.notion_api_key
+        embedder_config=config.embedder_config
     )
     
     try:
@@ -96,6 +97,60 @@ def create_notion_sync():
     
     return handler
 
+def create_notion_querier():
+    querier = NotionQuerier(
+        embedder_config=config.embedder_config,
+        qdrant_location=config.qdrant_location,
+        qdrant_api_key=config.qdrant_api_key
+    )
+    return querier
+
+def main():
+    """
+    Main function to handle Notion querying
+    """
+    try:
+        # First, sync Notion data to Qdrant
+        logger.info("Starting initial Notion sync...")
+        handler = NotionToQdrantHandler(
+            notion_api_key=config.notion_api_key,
+            qdrant_location=config.qdrant_location,
+            qdrant_api_key=config.qdrant_api_key,
+            embedder_config=config.embedder_config
+        )
+        handler.sync_notion_to_qdrant()
+        logger.info("Initial sync completed")
+
+        # Create querier for asking questions
+        querier = create_notion_querier()
+        
+        print("\nWelcome to Notion Query Interface!")
+        print("==================================")
+        print("You can ask questions about your Notion content")
+        print("Type 'quit' to exit\n")
+        
+        while True:
+            try:
+                question = input("\nYour question: ")
+                if question.lower() in ['quit', 'exit', 'q']:
+                    print("\nGoodbye!")
+                    break
+                    
+                print("\nThinking...")
+                answer = querier.ask_question(question)
+                print("\nAnswer:", answer)
+                print("\n" + "-"*50)  # Separator line
+                
+            except KeyboardInterrupt:
+                print("\nGoodbye!")
+                break
+            except Exception as e:
+                print(f"\nError: {e}")
+                print("Please try again with a different question")
+
+    except Exception as e:
+        logger.error(f"Error in main: {e}")
+        print("\nError initializing the system. Please check your configuration and try again.")
 
 #def create_gmail_listener() -> GmailInboxListener:
     """
@@ -125,13 +180,12 @@ def create_notion_sync():
     listener.add_handler(auto_reply_handler)
     return listener
 
-
 if __name__ == "__main__":
     # Register signal handler
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
     try:
-        create_notion_sync()
+        main()
     except KeyboardInterrupt:
         sys.exit(0)

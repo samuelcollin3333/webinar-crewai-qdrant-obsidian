@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import List
 
 
 class EmailThreadCategories(BaseModel):
@@ -29,3 +30,9 @@ class ContextualizedChunks(BaseModel):
     chunks: list[ContextualizedChunk] = Field(
         description="A list of contextualized chunks extracted from the document"
     )
+
+
+class NotionAnswer(BaseModel):
+    """Model for answers to questions about Notion data"""
+    answer: str
+    sources: List[str] = []  # List of Notion page URLs or titles used as sources

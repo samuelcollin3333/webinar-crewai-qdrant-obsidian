@@ -4,3 +4,4 @@ pydantic
 watchdog
 pyyaml
 notion-client
+flask>=2.0.0

@@ -3,6 +3,8 @@ import signal
 from pathlib import Path
 import time
 import sys
+from flask import Flask, render_template, request, jsonify
+import threading
 
 # Configure logging first, before any other operations
 logging.basicConfig(
@@ -41,6 +43,9 @@ logging.getLogger('httpx').setLevel(logging.WARNING)
 logging.getLogger('httpcore').setLevel(logging.WARNING)
 logging.getLogger('litellm').setLevel(logging.ERROR)
 logging.getLogger('litellm.cost_calculator').setLevel(logging.ERROR)
+
+app = Flask(__name__)
+querier = None
 
 def signal_handler(signum, frame):
     """Handle shutdown signals"""
@@ -98,6 +103,7 @@ def create_notion_sync():
     return handler
 
 def create_notion_querier():
+    global querier
     querier = NotionQuerier(
         embedder_config=config.embedder_config,
         qdrant_location=config.qdrant_location,
@@ -105,48 +111,39 @@ def create_notion_querier():
     )
     return querier
 
+@app.route('/')
+def home():
+    return render_template('chat.html')
+
+@app.route('/ask', methods=['POST'])
+def ask():
+    try:
+        question = request.json.get('question')
+        if not question:
+            return jsonify({'error': 'No question provided'}), 400
+        
+        answer = querier.ask_question(question)
+        return jsonify({'answer': answer})
+    except Exception as e:
+        logger.error(f"Error processing question: {e}")
+        return jsonify({'error': str(e)}), 500
+
 def main():
     """
     Main function to handle Notion querying
     """
     try:
-        # First, sync Notion data to Qdrant
+        # First, sync Notion data to Qdrant in a separate thread
         logger.info("Starting initial Notion sync...")
-        handler = NotionToQdrantHandler(
-            notion_api_key=config.notion_api_key,
-            qdrant_location=config.qdrant_location,
-            qdrant_api_key=config.qdrant_api_key,
-            embedder_config=config.embedder_config
-        )
-        handler.sync_notion_to_qdrant()
-        logger.info("Initial sync completed")
-
+        sync_thread = threading.Thread(target=create_notion_sync, daemon=True)
+        sync_thread.start()
+        
         # Create querier for asking questions
-        querier = create_notion_querier()
+        create_notion_querier()
         
-        print("\nWelcome to Notion Query Interface!")
-        print("==================================")
-        print("You can ask questions about your Notion content")
-        print("Type 'quit' to exit\n")
-        
-        while True:
-            try:
-                question = input("\nYour question: ")
-                if question.lower() in ['quit', 'exit', 'q']:
-                    print("\nGoodbye!")
-                    break
-                    
-                print("\nThinking...")
-                answer = querier.ask_question(question)
-                print("\nAnswer:", answer)
-                print("\n" + "-"*50)  # Separator line
-                
-            except KeyboardInterrupt:
-                print("\nGoodbye!")
-                break
-            except Exception as e:
-                print(f"\nError: {e}")
-                print("Please try again with a different question")
+        # Start the Flask application
+        logger.info("Starting web interface...")
+        app.run(host='0.0.0.0', port=5001, debug=False)  # Changed port to 5001
 
     except Exception as e:
         logger.error(f"Error in main: {e}")

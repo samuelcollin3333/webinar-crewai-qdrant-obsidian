@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion Chat Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 h-screen">
+    <div class="max-w-4xl mx-auto p-4 h-full flex flex-col">
+        <!-- Header -->
+        <div class="bg-white rounded-t-lg shadow p-4 mb-4">
+            <h1 class="text-2xl font-bold text-gray-800">Notion Query Interface</h1>
+            <p class="text-gray-600">Ask questions about your Notion content</p>
+        </div>
+
+        <!-- Chat Container -->
+        <div class="flex-1 bg-white rounded-lg shadow mb-4 p-4 overflow-y-auto" id="chat-container">
+            <div id="messages" class="space-y-4">
+                <!-- Messages will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Input Form -->
+        <form id="query-form" class="bg-white rounded-b-lg shadow p-4">
+            <div class="flex space-x-4">
+                <input type="text" 
+                       id="query-input"
+                       class="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Type your question here..."
+                       required>
+                <button type="submit"
+                        class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    Send
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById('query-form');
+        const input = document.getElementById('query-input');
+        const messages = document.getElementById('messages');
+
+        function addMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
+            
+            const messageBubble = document.createElement('div');
+            messageBubble.className = `max-w-[80%] rounded-lg p-4 ${
+                isUser ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-800'
+            }`;
+            messageBubble.textContent = content;
+            
+            messageDiv.appendChild(messageBubble);
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const question = input.value.trim();
+            if (!question) return;
+
+            // Add user message
+            addMessage(question, true);
+            
+            // Clear input
+            input.value = '';
+
+            // Add loading message
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'flex justify-start';
+            loadingDiv.innerHTML = `
+                <div class="max-w-[80%] rounded-lg p-4 bg-gray-100 text-gray-800">
+                    Thinking...
+                </div>
+            `;
+            messages.appendChild(loadingDiv);
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question }),
+                });
+                
+                const data = await response.json();
+                
+                // Remove loading message
+                messages.removeChild(loadingDiv);
+                
+                // Add response
+                addMessage(data.answer);
+            } catch (error) {
+                // Remove loading message
+                messages.removeChild(loadingDiv);
+                addMessage('Error: Failed to get response. Please try again.');
+            }
+        });
+    </script>
+</body>
+</html> 
